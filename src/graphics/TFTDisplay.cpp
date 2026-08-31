@@ -1991,6 +1991,15 @@ bool TFTDisplay::connect()
     if (!tft) {
 #if defined(RAK14014) || defined(HELTEC_MESH_NODE_T096) || defined(HELTEC_MESH_NODE_T1)
         tft = new TFT_eSPI;
+#elif defined(BADGE_JSCON2026)
+        // FSPI is used by the SX1262 LoRa radio. The display gets HSPI on its own
+        // pins. Everything is taken from variant.h rather than hardcoded, unlike
+        // the HACKADAY_COMMUNICATOR branch below.
+        Arduino_DataBus *bus = new Arduino_ESP32SPI(TFT_DC, TFT_CS, TFT_SCLK, TFT_MOSI, GFX_NOT_DEFINED /* MISO */, HSPI /* spi_num */);
+        tft = new Arduino_NV3007(bus, TFT_RST, TFT_ROTATION /* rotation */, false /* IPS */, TFT_WIDTH /* width */,
+                                 TFT_HEIGHT /* height */, TFT_OFFSET_X1 /* col_offset1 */, TFT_OFFSET_Y1 /* row_offset1 */,
+                                 TFT_OFFSET_X2 /* col_offset2 */, TFT_OFFSET_Y2 /* row_offset2 */, nv3007_279_init_operations,
+                                 sizeof(nv3007_279_init_operations));
 #elif defined(HACKADAY_COMMUNICATOR)
         Arduino_DataBus *bus =
             new Arduino_ESP32SPI(TFT_DC, TFT_CS, 38 /* SCK */, 21 /* MOSI */, GFX_NOT_DEFINED /* MISO */, HSPI /* spi_num */);
@@ -2054,6 +2063,8 @@ bool TFTDisplay::connect()
 #elif ARCH_PORTDUINO || defined(SENSECAP_INDICATOR) || defined(T_LORA_PAGER) || defined(T_WATCH_ULTRA) ||                        \
     defined(SEEED_WIO_TRACKER_L2)
     tft->setRotation(0); // use config.yaml to set rotation
+#elif defined(BADGE_JSCON2026)
+    tft->setRotation(TFT_ROTATION); // from variant.h; portrait 0 or 2, landscape 1 or 3
 #else
     tft->setRotation(3); // Orient horizontal and wide underneath the silkscreen name label
 #endif
