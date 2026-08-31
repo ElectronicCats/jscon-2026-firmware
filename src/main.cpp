@@ -1277,6 +1277,13 @@ void setup()
     // The node is up; let the SCM stop waiting on START_PENDING. No-op unless --service.
     windowsServiceReportRunning();
 #endif
+
+#if defined(BADGE_JSCON2026)
+    // Baseline for the JS runtime work: this is the heap actually available
+    // once Meshtastic, BLE, LoRa and the display have all allocated.
+    LOG_INFO("JSCON heap after setup: free=%u largest_block=%u", (unsigned)ESP.getFreeHeap(),
+             (unsigned)ESP.getMaxAllocHeap());
+#endif
 }
 
 #endif
