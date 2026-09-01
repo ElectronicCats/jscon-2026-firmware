@@ -81,6 +81,12 @@
 #define TFT_BLACK 0
 #define BRIGHTNESS_DEFAULT 254
 #define USE_TFTDISPLAY 1
+// REQUIRED. main.cpp only constructs graphics::Screen unconditionally when
+// HAS_SPI_TFT (or USE_EINK / USE_SPISSD1306) is defined; otherwise it waits for
+// an I2C-detected display, finds none on this board, and the screen is never
+// created at all - no TFT init ever runs and the panel stays dark with no error
+// in the log. hackaday-communicator sets this for the same reason.
+#define HAS_SPI_TFT 1
 
 // -- Buttons ------------------------------------------------------------------
 // All buttons are switch-to-GND with a debounce cap and no external pull
