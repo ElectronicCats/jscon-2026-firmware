@@ -6,8 +6,21 @@
 // Pinout verified against the KiCad netlist at
 // Documents/electronicCats/Hw/badge_JSCON_2026/hardware/
 
-// -- LoRa: VGdd79S915N0S1 915 MHz module (SX126x family) ---------------------
-#define USE_SX1262
+// -- LoRa: VGdd79S915N0S1 915 MHz module (Semtech LLCC68) --------------------
+// Confirmed against the VGdd79SxxxN0S1 hardware spec V1.2, section 1 (Overview)
+// and section 6 (Programming notes): this module is built on an LLCC68 die, NOT
+// an SX1262. Its driver is SX1262/SX1268-compatible, which is why the SX126X_*
+// pin defines below still apply, but the LLCC68 has narrower LoRa limits.
+//
+// LLCC68 LoRa limits, from spec section 6:
+//   BW 125 kHz -> SF 5 to 9
+//   BW 250 kHz -> SF 5 to 10
+//   BW 500 kHz -> SF 5 to 11
+// SF12 is unsupported at any bandwidth. Meshtastic's LongSlow and VLongSlow
+// presets need SF12 and fail with Critical Error #3 (see LLCC68Interface.h).
+// LongFast (BW 250, SF 11) also exceeds the BW-250 ceiling of SF10 in this
+// spec. Choose a preset that fits the table above.
+#define USE_LLCC68
 
 #define LORA_SCK 37  // IO37
 #define LORA_MISO 36 // IO36
@@ -23,12 +36,23 @@
 #define SX126X_BUSY LORA_DIO2
 #define SX126X_RESET LORA_RESET
 
-// WARNING: the two settings below are UNVERIFIED for this module. The
-// VGdd79S915N0S1 datasheet was not available when this variant was written.
-// They are copied from the Tropicon board's SX1262 and must be confirmed
-// against the part before any RF result is trusted. See Task 6.
+// DIO2 drives the module's internal antenna switch. Confirmed by the spec's
+// pin table (section 4, DIO2 row: "directly drives the module's internal
+// antenna switch, just call SetDio2AsRfSwitchCtrl()") and by section 6, which
+// shows SX126xSetDio2AsRfSwitchCtrl(true) as required. DIO2 is internal to the
+// module and is not brought out to a pad, which matches the board netlist.
 #define SX126X_DIO2_AS_RF_SWITCH
-#define SX126X_DIO3_TCXO_VOLTAGE 1.8
+
+// NO TCXO. The spec's parameter table (section 2) lists the 32 MHz reference as
+// "wu yuan jing zhen" - a passive crystal, not a temperature-compensated
+// oscillator - and section 6 wraps the SetDio3AsTcxoCtrl() call in #ifdef
+// USE_TCXO. Module pin 8 (DIO3) is left unconnected on this board, confirmed in
+// the netlist as unconnected-(U5-DIO3-Pad8).
+//
+// SX126X_DIO3_TCXO_VOLTAGE is therefore deliberately NOT defined. Defining it
+// would make the driver drive DIO3 as a TCXO supply and wait for a TCXO that
+// does not exist, which is the classic "radio inits then does not work"
+// failure. Do not add it back.
 
 // -- Display: ER-TFT2.79-1, NV3007 controller, on HSPI ------------------------
 // USE_ARDUINO_GFX selects the Arduino_GFX-typed `tft` member and code paths
