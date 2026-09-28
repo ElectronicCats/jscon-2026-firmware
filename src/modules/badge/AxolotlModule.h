@@ -20,7 +20,7 @@ class AxolotlModule : public SinglePortModule, private concurrency::OSThread
 
     const axolotl::Game &game() const { return state; }
 
-    /// Ask for an early hello, e.g. when the player opens a game page. Rate limited.
+    /// Call on every draw of a game page. Sends one early hello when the page is opened. Rate limited.
     void requestBoost();
 
     /// The axolotl unlocked most recently, or axolotl::kCount when none this boot.
@@ -42,9 +42,11 @@ class AxolotlModule : public SinglePortModule, private concurrency::OSThread
     uint32_t lastHelloMs = 0;
     uint32_t helloIntervalMs = 0;
     uint32_t lastBoostMs = 0;
+    uint32_t lastPageDrawMs = 0;
     uint32_t answerRequestedMs = 0;
     uint32_t answerDelayMs = 0;
     bool boostRequested = false;
+    bool pageSeen = false;
     bool answerPending = false;
     uint8_t lastUnlockedId = axolotl::kCount;
 };

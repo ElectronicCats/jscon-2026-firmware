@@ -23,7 +23,8 @@ constexpr uint32_t kTickMs = 500;
 constexpr uint32_t kHelloMinMs = 40000;
 constexpr uint32_t kHelloMaxMs = 70000;
 constexpr uint32_t kFirstHelloMs = 8000;
-constexpr uint32_t kBoostMinGapMs = 10000;
+constexpr uint32_t kBoostMinGapMs = 30000;
+constexpr uint32_t kPageClosedAfterMs = 5000; // no draw for this long means the player left the page
 constexpr uint32_t kAnswerMaxDelayMs = 2000;
 constexpr uint32_t kCelebrateMs = 5000;
 
@@ -57,7 +58,12 @@ AxolotlModule::AxolotlModule() : SinglePortModule("axolotl", meshtastic_PortNum_
 
 void AxolotlModule::requestBoost()
 {
-    boostRequested = true;
+    // Called on every draw of a game page. Only the first draw after the page was closed counts:
+    // a badge left sitting on the page must not keep sending early hellos.
+    if (!pageSeen || Throttle::hasElapsed(lastPageDrawMs, kPageClosedAfterMs))
+        boostRequested = true;
+    pageSeen = true;
+    lastPageDrawMs = millis();
 }
 
 ProcessMessage AxolotlModule::handleReceived(const meshtastic_MeshPacket &mp)
