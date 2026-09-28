@@ -1454,6 +1454,7 @@ static LGFX *tft = nullptr;
 static LGFX *tft = nullptr;
 
 #endif
+#include "BadgeSprites.h"
 #include "SPILock.h"
 #include "TFTColorRegions.h"
 #include "TFTDisplay.h"
@@ -1568,7 +1569,15 @@ void TFTDisplay::display(bool fromBlank)
     static uint32_t lastColorFrameSignature = 0;
     const bool hasColorRegions = graphics::getTFTColorRegionCount() > 0;
     const uint32_t colorFrameSignature = graphics::getTFTColorFrameSignature();
+#ifdef BADGE_JSCON2026
+    static uint32_t lastSpriteSignature = 0;
+    const uint32_t spriteSignature = graphics::getBadgeSpriteSignature();
+    const bool forceFullColorRepaint =
+        forceFullRepaint || (colorFrameSignature != lastColorFrameSignature) || (spriteSignature != lastSpriteSignature);
+    lastSpriteSignature = spriteSignature;
+#else
     const bool forceFullColorRepaint = forceFullRepaint || (colorFrameSignature != lastColorFrameSignature);
+#endif
 
     // When region roles/layout changed, color can differ even with identical monochrome glyph bits.
     // Repaint full frame only for those frames, then return to diff-based updates.
@@ -1607,6 +1616,10 @@ void TFTDisplay::display(bool fromBlank)
                         }
                     }
                 }
+#ifdef BADGE_JSCON2026
+                graphics::overlayBadgeSpritesRow(static_cast<int16_t>(y), 0, static_cast<int16_t>(displayWidth - 1), chunkRow,
+                                                 colorTftBlack);
+#endif
             }
 #if defined(USE_ARDUINO_GFX)
             tft->draw16bitBeRGBBitmap(0, yStart, repaintChunkBuffer, displayWidth, rowsThisChunk);
@@ -1621,6 +1634,9 @@ void TFTDisplay::display(bool fromBlank)
         lastDefaultOnColor = defaultOnColor;
         lastDefaultOffColor = defaultOffColor;
         graphics::clearTFTColorRegions();
+#ifdef BADGE_JSCON2026
+        graphics::clearBadgeSprites();
+#endif
         return;
     }
 #endif
@@ -1772,6 +1788,10 @@ void TFTDisplay::display(bool fromBlank)
                 linePixelBuffer[x] = isset ? colorTftWhite : colorTftBlack;
 #endif
             }
+#ifdef BADGE_JSCON2026
+            graphics::overlayBadgeSpritesRow(static_cast<int16_t>(y), static_cast<int16_t>(x_FirstPixelUpdate),
+                                             static_cast<int16_t>(x_LastPixelUpdate), linePixelBuffer, colorTftBlack);
+#endif
             const uint8_t lines_updated = 1;
 #endif
 
@@ -1799,6 +1819,9 @@ void TFTDisplay::display(bool fromBlank)
     lastDefaultOnColor = defaultOnColor;
     lastDefaultOffColor = defaultOffColor;
     graphics::clearTFTColorRegions();
+#ifdef BADGE_JSCON2026
+    graphics::clearBadgeSprites();
+#endif
 }
 
 void TFTDisplay::sdlLoop()
@@ -1992,10 +2015,11 @@ bool TFTDisplay::connect()
 #if defined(RAK14014) || defined(HELTEC_MESH_NODE_T096) || defined(HELTEC_MESH_NODE_T1)
         tft = new TFT_eSPI;
 #elif defined(BADGE_JSCON2026)
-        // FSPI is used by the SX1262 LoRa radio. The display gets HSPI on its own
+        // FSPI is used by the LLCC68 LoRa radio. The display gets HSPI on its own
         // pins. Everything is taken from variant.h rather than hardcoded, unlike
         // the HACKADAY_COMMUNICATOR branch below.
-        Arduino_DataBus *bus = new Arduino_ESP32SPI(TFT_DC, TFT_CS, TFT_SCLK, TFT_MOSI, GFX_NOT_DEFINED /* MISO */, HSPI /* spi_num */);
+        Arduino_DataBus *bus =
+            new Arduino_ESP32SPI(TFT_DC, TFT_CS, TFT_SCLK, TFT_MOSI, GFX_NOT_DEFINED /* MISO */, HSPI /* spi_num */);
         tft = new Arduino_NV3007(bus, TFT_RST, TFT_ROTATION /* rotation */, false /* IPS */, TFT_WIDTH /* width */,
                                  TFT_HEIGHT /* height */, TFT_OFFSET_X1 /* col_offset1 */, TFT_OFFSET_Y1 /* row_offset1 */,
                                  TFT_OFFSET_X2 /* col_offset2 */, TFT_OFFSET_Y2 /* row_offset2 */, nv3007_279_init_operations,

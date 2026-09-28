@@ -60,21 +60,21 @@
 // explicitly in the task brief, but required: hackaday-communicator, which
 // shares the same NV3007 connect() code path, sets this too.
 #define USE_ARDUINO_GFX 1
-#define TFT_MOSI 11  // IO11 = SDA
-#define TFT_SCLK 12  // IO12 = SCL
-#define TFT_DC 9     // IO09 = RS  (data/command)
-#define TFT_RST 10   // IO10 = display reset
-#define TFT_CS 21    // IO21 = chip select
-#define TFT_MISO -1  // not connected
-#define TFT_BL 2     // IO02 = backlight, PWM through Q2
+#define TFT_MOSI 11 // IO11 = SDA
+#define TFT_SCLK 12 // IO12 = SCL
+#define TFT_DC 9    // IO09 = RS  (data/command)
+#define TFT_RST 10  // IO10 = display reset
+#define TFT_CS 21   // IO21 = chip select
+#define TFT_MISO -1 // not connected
+#define TFT_BL 2    // IO02 = backlight, PWM through Q2
 
-#define TFT_HEIGHT 428   // physical rows
-#define TFT_WIDTH 142    // physical columns
+#define TFT_HEIGHT 428 // physical rows
+#define TFT_WIDTH 142  // physical columns
 #define TFT_OFFSET_X1 12
 #define TFT_OFFSET_Y1 0
 #define TFT_OFFSET_X2 14
 #define TFT_OFFSET_Y2 0
-#define SCREEN_ROTATE    // swap logical dimensions for the Meshtastic UI
+#define SCREEN_ROTATE // swap logical dimensions for the Meshtastic UI
 #define TFT_ROTATION 1
 #define SCREEN_TRANSITION_FRAMERATE 5
 #define HAS_SCREEN 1
@@ -88,33 +88,45 @@
 // in the log. hackaday-communicator sets this for the same reason.
 #define HAS_SPI_TFT 1
 
-// -- Buttons ------------------------------------------------------------------
-// All buttons are switch-to-GND with a debounce cap and no external pull
-// resistors, so they need internal pullups.
-//
-// Primary button (IO40): short press advances the frame, long press opens the
-// menu, very long press shuts down. Handled by Meshtastic ButtonThread.
-#define BUTTON_PIN 40
-#define BUTTON_ACTIVE_LOW true
-#define BUTTON_ACTIVE_PULLUP true
+// -- Branding -----------------------------------------------------------------
+// JSConf Mexico 2026 logo as the only boot screen, and the brand colors for the
+// default theme (see the BADGE_JSCON2026 entry in TFTColorRegions.cpp): the
+// kit's navy background with a darker header bar.
+#include "jsconf_branding.h"
+#define TFT_HEADER_BG_COLOR_OVERRIDE JSCONF_COLOR_DEEP
 
-// Directional buttons are routed through TrackballInterruptImpl1, which emits
-// INPUT_BROKER_UP / DOWN / LEFT / RIGHT into InputBroker with no custom code.
+// -- Buttons ------------------------------------------------------------------
+// All four are switch-to-GND with a debounce cap and no external pull
+// resistors, so they use internal pullups. Verified on hardware with a
+// standalone GPIO diagnostic: every button gives exactly one clean edge per
+// press, no bounce, no float (IO43 included).
 //
-// WARNING: IO43 is UART0 TX. It floats high during boot because the ROM
-// bootloader drives it, and this board has no PCB pull-down. Validate this
-// button explicitly on hardware. See Task 4.
-#define HAS_TRACKBALL 1
-#define TB_UP 255    // no dedicated pin; IO40 is owned by ButtonThread
-#define TB_DOWN 43   // IO43 - UART0 TX, see warning above
-#define TB_LEFT 1    // IO01
-#define TB_RIGHT 18  // IO18
-#define TB_PRESS 255 // IO40 press timing is owned by ButtonThread
+// Behaviour, all on SHORT press, no long-press:
+//   IO40 and IO43 move between pages, and up / down inside menus
+//   IO18 selects
+//   IO01 goes back
+//
+// BadgeJsconButtons (src/input/BadgeJsconButtons.cpp) drives all four with a
+// polled, debounced reader. The upstream trackball driver is built for a
+// rotating trackball: on plain pushbuttons it dropped taps, doubled them
+// (measured 100-160 ms apart with TB_THRESHOLD 1) or auto-repeated.
+//
+// HAS_TRACKBALL is 0 so that driver does not claim the pins, and BUTTON_PIN is
+// deliberately NOT defined so ButtonThread does not claim IO40. The TB_*
+// defines are kept only as the pin source for BadgeJsconButtons.
+#define HAS_TRACKBALL 0
+#define TB_UP 40     // IO40 - previous page / up
+#define TB_DOWN 43   // IO43 - next page / down
+#define TB_LEFT 1    // IO01 - back
+#define TB_RIGHT 255 // unused
+#define TB_PRESS 18  // IO18 - select
 #define TB_DIRECTION FALLING
 
 // -- Absent hardware ----------------------------------------------------------
 // No GPS, no battery, no I2C sensors, no secondary radio.
 #define GPS_DEFAULT_NOT_PRESENT 1
+// Compiles the GPS driver and the GPS page out of the UI.
+#define HAS_GPS 0
 // No I2C bus is wired on this board. This disables Meshtastic's own I2C
 // scanning/usage in main.cpp; it does not affect the SDA/SCL macros needed
 // below purely to let the Arduino Wire library compile.

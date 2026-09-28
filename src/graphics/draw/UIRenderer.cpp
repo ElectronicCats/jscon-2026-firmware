@@ -15,11 +15,13 @@
 #include "UIRenderer.h"
 #include "airtime.h"
 #include "gps/GeoCoord.h"
+#include "graphics/BadgeSprites.h"
 #include "graphics/EmoteRenderer.h"
 #include "graphics/SharedUIDisplay.h"
 #include "graphics/TFTColorRegions.h"
 #include "graphics/TFTPalette.h"
 #include "graphics/TimeFormatters.h"
+#include "graphics/draw/BadgeAxolotlRenderer.h"
 #include "graphics/images.h"
 #include "main.h"
 #include "target_specific.h"
@@ -1311,6 +1313,9 @@ void UIRenderer::drawFavoriteNode(OLEDDisplay *display, OLEDDisplayUiState *stat
 // ****************************
 void UIRenderer::drawDeviceFocused(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
 {
+#ifdef BADGE_JSCON2026
+    BadgeAxolotlRenderer::queueCornerAxolotl(display, x, y);
+#endif
     display->clear();
     display->setTextAlignment(TEXT_ALIGN_LEFT);
     display->setFont(FONT_SMALL);
@@ -1756,6 +1761,11 @@ void UIRenderer::drawIconScreen(const char *upperMsg, OLEDDisplay *display, OLED
 
 void UIRenderer::drawBootIconScreen(const char *upperMsg, OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
 {
+#if defined(BADGE_JSCON2026) && defined(USERPREFS_OEM_TEXT)
+    // The badge boots straight into the JSConf Mexico logo.
+    drawOEMIconScreen(upperMsg, display, state, x, y);
+    return;
+#endif
 #if GRAPHICS_TFT_COLORING_ENABLED
     // Meshtastic brand green background with black foreground text/icon on TFT startup screen.
     static constexpr uint16_t kMeshtasticGreen = TFTPalette::rgb565(103, 234, 145);
@@ -2017,6 +2027,16 @@ void UIRenderer::drawCompassAndLocationScreen(OLEDDisplay *display, OLEDDisplayU
 void UIRenderer::drawOEMIconScreen(const char *upperMsg, OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
 {
     static const uint8_t xbm[] = USERPREFS_OEM_IMAGE_DATA;
+#if defined(BADGE_JSCON2026) && GRAPHICS_TFT_COLORING_ENABLED
+    // Tint the flower and the wordmark with their brand colors; the image itself is 1 bit.
+    const int16_t logoX = x + (SCREEN_WIDTH - USERPREFS_OEM_IMAGE_WIDTH) / 2;
+    const int16_t logoY = y + (SCREEN_HEIGHT - FONT_HEIGHT_MEDIUM - USERPREFS_OEM_IMAGE_HEIGHT) / 2 + 2;
+    registerTFTColorRegionDirect(x, y, SCREEN_WIDTH, SCREEN_HEIGHT, TFTPalette::White, TFTPalette::Black);
+    registerTFTColorRegionDirect(logoX + JSCONF_LOGO_ISOTYPE_X, logoY + JSCONF_LOGO_ISOTYPE_Y, JSCONF_LOGO_ISOTYPE_W,
+                                 JSCONF_LOGO_ISOTYPE_H, JSCONF_COLOR_YELLOW, TFTPalette::Black);
+    registerTFTColorRegionDirect(logoX + JSCONF_LOGO_WORDMARK_X, logoY + JSCONF_LOGO_WORDMARK_Y, JSCONF_LOGO_WORDMARK_W,
+                                 JSCONF_LOGO_WORDMARK_H, JSCONF_COLOR_RED, TFTPalette::Black);
+#endif
     if (currentResolution == ScreenResolution::High) {
         display->drawXbm(x + (SCREEN_WIDTH - USERPREFS_OEM_IMAGE_WIDTH) / 2,
                          y + (SCREEN_HEIGHT - FONT_HEIGHT_MEDIUM - USERPREFS_OEM_IMAGE_HEIGHT) / 2 + 2, USERPREFS_OEM_IMAGE_WIDTH,
@@ -2046,6 +2066,16 @@ void UIRenderer::drawOEMIconScreen(const char *upperMsg, OLEDDisplay *display, O
         display->drawString(x + getStringCenteredX(title), y + SCREEN_HEIGHT - FONT_HEIGHT_MEDIUM, title);
     }
     display->setFont(FONT_SMALL);
+
+#ifdef BADGE_JSCON2026
+    const char *poweredBy = "Powered by Meshtastic";
+    const int16_t poweredByW = display->getStringWidth(poweredBy);
+    const int16_t poweredByX = x + (SCREEN_WIDTH - poweredByW) / 2;
+    display->drawString(poweredByX, y + 0, poweredBy);
+#if GRAPHICS_TFT_COLORING_ENABLED
+    registerTFTColorRegionDirect(poweredByX, y, poweredByW, FONT_HEIGHT_SMALL, TFTPalette::MeshtasticGreen, TFTPalette::Black);
+#endif
+#endif
 
     // Draw region in upper left
     if (upperMsg)

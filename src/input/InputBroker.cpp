@@ -1,4 +1,7 @@
 #include "InputBroker.h"
+#ifdef BADGE_JSCON2026
+#include "BadgeJsconButtons.h"
+#endif
 #include "PowerFSM.h" // needed for event trigger
 #include "configuration.h"
 #include "graphics/Screen.h"
@@ -508,6 +511,13 @@ void InputBroker::Init()
         trackballInterruptImpl1 = new TrackballInterruptImpl1();
         trackballInterruptImpl1->init(TB_DOWN, TB_UP, TB_LEFT, TB_RIGHT, TB_PRESS);
     }
+#endif
+#ifdef BADGE_JSCON2026
+    // Four plain pushbuttons. Uses its own polled, debounced driver rather than
+    // the trackball driver, which is built for a rotating trackball and either
+    // drops taps, doubles them, or auto-repeats depending on how it is tuned.
+    badgeJsconButtons = new BadgeJsconButtons();
+    badgeJsconButtons->init();
 #endif
 #ifdef INPUTBROKER_EXPRESSLRSFIVEWAY_TYPE
     expressLRSFiveWayInput = new ExpressLRSFiveWay();

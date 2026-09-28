@@ -49,7 +49,9 @@ extern NicheGraphics::BaseUIEInkDisplay *setupNicheGraphicsBaseUI();
 #include "draw/NodeListRenderer.h"
 #include "draw/NotificationRenderer.h"
 #include "draw/UIRenderer.h"
+#include "graphics/BadgeSprites.h"
 #include "graphics/TFTColorRegions.h"
+#include "graphics/draw/BadgeAxolotlRenderer.h"
 #include "modules/CannedMessageModule.h"
 #if HAS_TELEMETRY && HAS_SENSOR && !MESHTASTIC_EXCLUDE_ENVIRONMENTAL_SENSOR
 #include "modules/Telemetry/EnvironmentTelemetry.h"
@@ -137,6 +139,11 @@ static inline void prepareFrameColorRegions()
         setAndRegisterTFTColorRole(TFTColorRole::FrameMono, getThemeBodyFg(), getThemeBodyBg(), 0, 0, screen->getWidth(),
                                    screen->getHeight());
     }
+#ifdef BADGE_JSCON2026
+    // Every frame starts with the JSConf pattern behind it; a frame may queue its own on top.
+    clearBadgeSprites();
+    queueBadgeSprite(badgeBackgroundData, 0, 0);
+#endif
 #endif
 }
 #endif
@@ -920,8 +927,8 @@ void Screen::setup()
     // Enable UTF-8 to display mapping
     dispdev->setFontTableLookupFunction(customFontTableLookup);
 
-#ifdef USERPREFS_OEM_TEXT
-    logo_timeout *= 2; // Give more time for branded boot logos
+#if defined(USERPREFS_OEM_TEXT) && !defined(BADGE_JSCON2026) // the badge shows a single logo
+    logo_timeout *= 2;                                       // Give more time for branded boot logos
 #endif
 
     // Configure alert frames (e.g., "Resuming..." or region name)
@@ -1441,12 +1448,14 @@ void Screen::setFrames(FrameFocus focus)
         indicatorIcons.push_back(icon_nodes);
         PUSH_FRAME_TITLE("Nodes");
     }
+#ifndef BADGE_JSCON2026 // no GPS on the badge, so distance and bearing have nothing to show
     if (!hiddenFrames.nodelist_location) {
         fsi.positions.nodelist_location = numframes;
         normalFrames[numframes++] = graphics::NodeListRenderer::drawDynamicListScreen_Location;
         indicatorIcons.push_back(icon_list);
         PUSH_FRAME_TITLE("Node List");
     }
+#endif
 #endif
 
 // Show detailed node views only on E-Ink builds
@@ -1511,12 +1520,29 @@ void Screen::setFrames(FrameFocus focus)
         PUSH_FRAME_TITLE("Clock");
     }
 #endif
+#ifdef BADGE_JSCON2026
+    // The axolotl game pages, then the name tag that replaces Chirpy. Always shown on the badge.
+    graphics::BadgeAxolotlRenderer::setCollectionFrameIndex(numframes);
+    normalFrames[numframes++] = graphics::BadgeAxolotlRenderer::drawCollectionFrame;
+    indicatorIcons.push_back(icon_list);
+    PUSH_FRAME_TITLE("Ajolodex");
+    normalFrames[numframes++] = graphics::BadgeAxolotlRenderer::drawRadarFrame;
+    indicatorIcons.push_back(icon_radio);
+    PUSH_FRAME_TITLE("Radar");
+    {
+        fsi.positions.chirpy = numframes;
+        normalFrames[numframes++] = graphics::DebugRenderer::drawChirpy;
+        indicatorIcons.push_back(chirpy_small);
+        PUSH_FRAME_TITLE("Name tag");
+    }
+#else
     if (!hiddenFrames.chirpy) {
         fsi.positions.chirpy = numframes;
         normalFrames[numframes++] = graphics::DebugRenderer::drawChirpy;
         indicatorIcons.push_back(chirpy_small);
         PUSH_FRAME_TITLE("Chirpy");
     }
+#endif
 
 #if HAS_WIFI && !defined(ARCH_PORTDUINO)
     if (!hiddenFrames.wifi && isWifiAvailable()) {
@@ -2172,6 +2198,12 @@ int Screen::handleInputEvent(const InputEvent *event)
         menuHandler::handleMenuSwitch(dispdev);
         return 0;
     }
+#ifdef BADGE_JSCON2026
+    if (showingNormalScreen && BadgeAxolotlRenderer::handleInput(event, ui->getUiState()->currentFrame)) {
+        setFastFramerate();
+        return 0;
+    }
+#endif
     // UP/DOWN in message screen scrolls through message threads
     if (ui->getUiState()->currentFrame == framesetInfo.positions.textMessage) {
 

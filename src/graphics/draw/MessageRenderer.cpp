@@ -8,6 +8,7 @@
 #include "UIRenderer.h"
 #include "UptimeClock.h"
 #include "gps/RTC.h"
+#include "graphics/BadgeSprites.h"
 #include "graphics/EmoteRenderer.h"
 #include "graphics/Screen.h"
 #include "graphics/ScreenFonts.h"
@@ -15,6 +16,7 @@
 #include "graphics/TFTColorRegions.h"
 #include "graphics/TFTPalette.h"
 #include "graphics/TimeFormatters.h"
+#include "graphics/draw/BadgeAxolotlRenderer.h"
 #include "graphics/draw/NotificationRenderer.h"
 #include "graphics/emotes.h"
 #include "main.h"
@@ -502,6 +504,9 @@ void drawTextMessageFrame(OLEDDisplay *display, OLEDDisplayUiState *state, int16
         const char *messageString = "No messages";
         int center_text = (SCREEN_WIDTH / 2) - (display->getStringWidth(messageString) / 2);
         display->drawString(center_text, getTextPositions(display)[2], messageString);
+#ifdef BADGE_JSCON2026
+        BadgeAxolotlRenderer::queueCornerAxolotl(display, x, y);
+#endif
         graphics::drawCommonFooter(display, x, y);
         return;
     }

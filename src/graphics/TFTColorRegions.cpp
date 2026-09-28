@@ -104,6 +104,37 @@ static constexpr uint16_t kStatusColor = TFTPalette::White;
 
 static const TFTThemeDef kThemes[] = {
 
+#ifdef BADGE_JSCON2026
+    // The badge replaces Default Dark with the JSConf Mexico palette: the kit's navy background,
+    // a darker navy for bars and menus, gold accents.
+    {
+        ThemeID::DefaultDark, // id
+        "JSConf MX",          // name
+        0,                    // uniqueIdentifier
+        {
+            {JSCONF_COLOR_DEEP, TFTPalette::Black}, // HeaderBackground
+            {JSCONF_COLOR_DEEP, TFTPalette::White}, // HeaderTitle
+            {JSCONF_COLOR_DEEP, TFTPalette::White}, // HeaderStatus
+            {JSCONF_COLOR_GOLD, JSCONF_COLOR_NAVY}, // SignalBars
+            {JSCONF_COLOR_GOLD, JSCONF_COLOR_NAVY}, // ConnectionIcon
+            {JSCONF_COLOR_GOLD, JSCONF_COLOR_NAVY}, // UtilizationFill
+            {JSCONF_COLOR_GOLD, JSCONF_COLOR_NAVY}, // FavoriteNode
+            {JSCONF_COLOR_GOLD, JSCONF_COLOR_DEEP}, // ActionMenuBorder
+            {TFTPalette::White, JSCONF_COLOR_DEEP}, // ActionMenuBody
+            {JSCONF_COLOR_DEEP, JSCONF_COLOR_GOLD}, // ActionMenuTitle
+            {JSCONF_COLOR_NAVY, TFTPalette::White}, // FrameMono
+            {TFTPalette::White, TFTPalette::Black}, // BootSplash
+            {JSCONF_COLOR_GOLD, JSCONF_COLOR_NAVY}, // FavoriteNodeBGHighlight
+            {JSCONF_COLOR_GOLD, JSCONF_COLOR_DEEP}, // NavigationBar  (icon fg, bar bg)
+            {JSCONF_COLOR_GOLD, JSCONF_COLOR_NAVY}, // NavigationArrow (arrow fg, body bg)
+        },
+        TFTPalette::Good,   // batteryFillGood
+        TFTPalette::Medium, // batteryFillMedium
+        TFTPalette::Bad,    // batteryFillBad
+        true,               // fullFrameInvert
+        true,               // visible
+    },
+#else
     // Default Dark (ThemeID::DefaultDark = 0)
     {
         ThemeID::DefaultDark, // id
@@ -133,6 +164,7 @@ static const TFTThemeDef kThemes[] = {
         false,              // fullFrameInvert
         true,               // visible
     },
+#endif
 
     // Default Light (ThemeID::DefaultLight = 1)
     {
@@ -659,6 +691,14 @@ void setTFTColorRole(TFTColorRole role, uint16_t onColor, uint16_t offColor)
                 replaceColor(offColor, TFTPalette::Black, TFTPalette::Navy);
             }
             break;
+#ifdef BADGE_JSCON2026
+        case ThemeID::DefaultDark:
+            if (isHighlightRole || isBodyRole) {
+                replaceColor(onColor, TFTPalette::Yellow, JSCONF_COLOR_GOLD);
+                replaceColor(offColor, TFTPalette::Black, JSCONF_COLOR_NAVY);
+            }
+            break;
+#endif
         default:
             break;
         }

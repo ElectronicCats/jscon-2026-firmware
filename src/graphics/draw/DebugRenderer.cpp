@@ -8,6 +8,12 @@
 #include "UIRenderer.h"
 #include "airtime.h"
 #include "gps/RTC.h"
+#include "graphics/BadgeSprites.h"
+#include "graphics/draw/BadgeAxolotlRenderer.h"
+#include "modules/badge/AxolotlModule.h"
+#ifdef BADGE_JSCON2026
+#include "jsconf_font.h"
+#endif
 #include "graphics/ScreenFonts.h"
 #include "graphics/SharedUIDisplay.h"
 #include "graphics/TFTColorRegions.h"
@@ -135,6 +141,9 @@ void drawFrameWiFi(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, i
 // ****************************
 void drawLoRaFocused(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
 {
+#ifdef BADGE_JSCON2026
+    BadgeAxolotlRenderer::queueCornerAxolotl(display, x, y);
+#endif
     display->clear();
     display->setTextAlignment(TEXT_ALIGN_LEFT);
     display->setFont(FONT_SMALL);
@@ -549,6 +558,52 @@ void drawSystemScreen(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x
 // ****************************
 void drawChirpy(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
 {
+#ifdef BADGE_JSCON2026
+    // The badge shows a name tag here instead of Chirpy: the owner's name on a card, next to the
+    // axolotl this badge was born with, over the JSConf Mexico pattern.
+    display->clear();
+    display->setTextAlignment(TEXT_ALIGN_LEFT);
+    queueBadgeSprite(badgeBackgroundName, x, y);
+    const uint8_t ownAxolotl = axolotlModule ? axolotlModule->game().home() : 0;
+    const BadgeSprite &axolotl = axolotlSprite(ownAxolotl, AxolotlSize::Large);
+    const int16_t slotX = JSCONF_NAME_CARD_X + JSCONF_NAME_CARD_W;
+    queueBadgeSprite(axolotl, x + slotX + (SCREEN_WIDTH - slotX - axolotl.width) / 2, y + (SCREEN_HEIGHT - axolotl.height) / 2);
+
+    const char *name = owner.long_name[0] ? owner.long_name : "JSConf MX";
+    const int16_t innerWidth = JSCONF_NAME_CARD_W - 12;
+    int16_t nameHeight = JSCONF_FONT_NAME_HEIGHT;
+    display->setFont(jsconfFontName);
+    if (display->getStringWidth(name) > innerWidth) {
+        display->setFont(FONT_LARGE);
+        nameHeight = FONT_HEIGHT_LARGE;
+    }
+    if (display->getStringWidth(name) > innerWidth) {
+        display->setFont(FONT_SMALL);
+        nameHeight = FONT_HEIGHT_SMALL;
+    }
+    const int16_t cardX = x + JSCONF_NAME_CARD_X;
+    const int16_t cardY = y + JSCONF_NAME_CARD_Y;
+    const int16_t nameBandHeight = JSCONF_NAME_CARD_H - FONT_HEIGHT_SMALL - 8;
+    const int16_t nameY = cardY + 4 + (nameBandHeight - nameHeight) / 2;
+    display->drawString(cardX + (JSCONF_NAME_CARD_W - display->getStringWidth(name)) / 2, nameY, name);
+
+    display->setFont(FONT_SMALL);
+    char detail[48];
+    const uint8_t collected = axolotlModule ? axolotlModule->game().collectedCount() : 1;
+    if (collected >= axolotl::kCount)
+        snprintf(detail, sizeof(detail), "Maestro Ajolotero  %u/%u", collected, axolotl::kCount);
+    else
+        snprintf(detail, sizeof(detail), "%s  -  %s  %u/%u", owner.short_name, AxolotlModule::nameOf(ownAxolotl), collected,
+                 axolotl::kCount);
+    const int16_t detailY = cardY + JSCONF_NAME_CARD_H - FONT_HEIGHT_SMALL - 4;
+    display->drawString(cardX + (JSCONF_NAME_CARD_W - display->getStringWidth(detail)) / 2, detailY, detail);
+#if GRAPHICS_TFT_COLORING_ENABLED
+    // Off pixels keep the body color so the background, with its card, shows through.
+    registerTFTColorRegionDirect(cardX + 4, cardY + 4, JSCONF_NAME_CARD_W - 8, nameBandHeight, JSCONF_COLOR_GOLD,
+                                 getThemeBodyBg());
+#endif
+    return;
+#endif
     display->clear();
     display->setTextAlignment(TEXT_ALIGN_LEFT);
     display->setFont(FONT_SMALL);
