@@ -83,7 +83,7 @@ esptool --chip esp32s3 --port <port> write-flash 0x0 badge_jscon2026-factory.bin
 On macOS the port looks like `/dev/cu.usbmodem11401`. On Linux it looks like `/dev/ttyACM0`.
 
 - Erasing removes the badge's name, keys and axolotl collection. The badge's own axolotl comes back, because it is tied to the hardware.
-- To update a badge and keep its collection, write `badge_jscon2026-app.bin` at `0x10000` instead, without erasing.
+- To update a badge and keep its name and collection, skip the erase and run only the `write-flash` command.
 - If a badge does not start after flashing, hold BOOT, press RESET, release BOOT, and flash again.
 
 A freshly flashed badge needs no setup: it starts on region US with the SHORT_FAST preset.
