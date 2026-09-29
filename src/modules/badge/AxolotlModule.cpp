@@ -73,8 +73,10 @@ ProcessMessage AxolotlModule::handleReceived(const meshtastic_MeshPacket &mp)
         return ProcessMessage::CONTINUE; // some other use of the private port
 
     const bool direct = getHopsAway(mp) == 0 && !mp.via_mqtt && mp.has_rx_rssi;
+#ifdef INPUT_DEBUG
     LOG_INFO("Axolotl: heard 0x%08x %s%s rssi=%d snr=%.1f direct=%d", mp.from, nameOf(hello.home),
              hello.isAnswer ? " (answer)" : "", (int)mp.rx_rssi, mp.rx_snr, direct);
+#endif
 
     const axolotl::Outcome outcome = state.onHello(mp.from, hello.home, mp.rx_rssi, direct, millis());
     if (outcome.unlocked)
