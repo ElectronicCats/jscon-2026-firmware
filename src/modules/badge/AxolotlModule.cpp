@@ -43,7 +43,14 @@ AxolotlModule::AxolotlModule() : SinglePortModule("axolotl", meshtastic_PortNum_
     // key and changes whenever the keys are regenerated, the MAC address never does.
     uint8_t mac[6];
     getMacAddr(mac);
-    state.begin((uint32_t)mac[2] << 24 | (uint32_t)mac[3] << 16 | (uint32_t)mac[4] << 8 | mac[5]);
+    const uint32_t hardwareId = (uint32_t)mac[2] << 24 | (uint32_t)mac[3] << 16 | (uint32_t)mac[4] << 8 | mac[5];
+#ifdef BADGE_AXOLOTL_FORCE_HOME
+    // Seed badge: carries a fixed axolotl so that it is guaranteed to exist at the event.
+    state.begin(hardwareId, BADGE_AXOLOTL_FORCE_HOME);
+    LOG_WARN("Axolotl: SEED badge, axolotl fixed to %s", nameOf(state.home()));
+#else
+    state.begin(hardwareId);
+#endif
     loadFromFlash();
 #ifdef BADGE_AXOLOTL_PREVIEW_ALL
     state.previewAllCollected();

@@ -67,6 +67,21 @@ void test_newGame_ownsOnlyHome()
     TEST_ASSERT_FALSE(game.isComplete());
 }
 
+void test_seedBadge_hasFixedHome()
+{
+    for (uint8_t forced = 0; forced < kCount; forced++) {
+        Game game;
+        game.begin(kSelf, forced);
+        TEST_ASSERT_EQUAL_UINT8(forced, game.home());
+        TEST_ASSERT_TRUE(game.has(forced));
+        TEST_ASSERT_EQUAL_UINT8(1, game.collectedCount());
+        TEST_ASSERT_EQUAL_UINT8(forced, game.makeHello(false).home);
+    }
+    Game game;
+    game.begin(kSelf, kCount); // out of range means "not forced"
+    TEST_ASSERT_EQUAL_UINT8(homeFromNodeId(kSelf), game.home());
+}
+
 static uint8_t otherThan(uint8_t home)
 {
     return (home + 1) % kCount;
@@ -338,6 +353,7 @@ void setup()
     RUN_TEST(test_home_rarityShares);
     RUN_TEST(test_rarity_tierSizes);
     RUN_TEST(test_newGame_ownsOnlyHome);
+    RUN_TEST(test_seedBadge_hasFixedHome);
     RUN_TEST(test_oneStrongReading_doesNotUnlock);
     RUN_TEST(test_twoStrongReadings_unlock);
     RUN_TEST(test_secondReadingTooLate_startsOver);

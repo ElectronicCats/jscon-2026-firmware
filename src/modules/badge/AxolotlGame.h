@@ -116,10 +116,11 @@ constexpr uint8_t kSaveVersion = 2;
 class Game
 {
   public:
-    void begin(uint32_t selfNodeId)
+    // forcedHome pins the axolotl of a seed badge; leave it at kCount to derive it from the id.
+    void begin(uint32_t selfNodeId, uint8_t forcedHome = kCount)
     {
         self = selfNodeId;
-        homeId = homeFromNodeId(selfNodeId);
+        homeId = forcedHome < kCount ? forcedHome : homeFromNodeId(selfNodeId);
         collected = static_cast<uint16_t>(1u << homeId);
         met = 0;
         metUsed = 0;
