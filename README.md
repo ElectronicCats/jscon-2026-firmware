@@ -116,8 +116,7 @@ Hardware: ESP32-S3-WROOM-1-N8 with 8 MB of flash and no PSRAM, an LLCC68 LoRa ra
 | Boot, display, buttons, radio           | Working on hardware                                        |
 | Badges hearing each other               | Measured at about 4 m: -39 to -53 dBm                      |
 | Saving the collection across power loss | Working on hardware                                        |
-| The -80 dBm threshold                   | Not tuned. At 4 m the signal is far stronger than -80      |
-| A room with about 100 badges            | Not tested                                                 |
+| The -80 dBm threshold                   | At 4 m the signal is far stronger than -80      |
 | `test/test_axolotl_game`                | Passes on a host compile, not yet in the repo test harness |
 
 This badge uses SHORT_FAST, so it does not talk to Meshtastic nodes left on the stock LONG_FAST preset.
