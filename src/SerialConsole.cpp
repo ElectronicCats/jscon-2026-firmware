@@ -193,6 +193,13 @@ bool SerialConsole::checkIsConnected()
     return Throttle::isWithinTimespanMs(lastContactMsec, SERIAL_CONNECTION_TIMEOUT);
 }
 
+#if defined(BADGE_JSCON2026) && defined(IS_USB_SERIAL)
+// HWCDC returns a short blocking write only after ~2 s without progress. A host that closed the
+// port without ToRadio.disconnect would cost that on every write, so stop blocking until it talks again.
+static bool s_hostDraining = false;
+static constexpr uint32_t kHostStallMs = 1000;
+#endif
+
 /// Select bounded or non-blocking HWCDC writes based on host liveness.
 void SerialConsole::setHostDraining(bool draining)
 {
@@ -200,6 +207,9 @@ void SerialConsole::setHostDraining(bool draining)
     // Timeout 0 makes HWCDC writes drop instead of block when the host stops draining;
     // bounded blocking is restored while an API client is connected so frames aren't truncated.
     Port.setTxTimeoutMs(draining ? 100 : 0);
+#ifdef BADGE_JSCON2026
+    s_hostDraining = draining;
+#endif
 #else
     (void)draining;
 #endif
@@ -225,7 +235,15 @@ bool SerialConsole::finishPendingFrame()
 {
 #ifdef IS_USB_SERIAL
     concurrency::LockGuard guard(&streamLock);
+#ifdef BADGE_JSCON2026
+    const uint32_t startedMs = millis();
+    const bool finished = frameWriter.finishPendingFrame(Port);
+    if (s_hostDraining && !finished && !Throttle::isWithinTimespanMs(startedMs, kHostStallMs))
+        setHostDraining(false);
+    return finished;
+#else
     return frameWriter.finishPendingFrame(Port);
+#endif
 #else
     return true;
 #endif
@@ -263,7 +281,15 @@ bool SerialConsole::writeFrame(uint8_t *buf, size_t len, bool bestEffort)
     const size_t totalLen = buildFrameHeader(buf, len);
 
     concurrency::LockGuard guard(&streamLock);
+#ifdef BADGE_JSCON2026
+    const uint32_t startedMs = millis();
+    const bool written = frameWriter.writeFrame(Port, buf, totalLen, bestEffort);
+    if (s_hostDraining && !written && !Throttle::isWithinTimespanMs(startedMs, kHostStallMs))
+        setHostDraining(false);
+    return written;
+#else
     return frameWriter.writeFrame(Port, buf, totalLen, bestEffort);
+#endif
 #else
     return StreamAPI::writeFrame(buf, len, bestEffort);
 #endif
