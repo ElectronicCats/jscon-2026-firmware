@@ -131,7 +131,22 @@ int32_t SerialConsole::runOnce()
         return delay < 25 ? delay : 25; // 0 continues a budget slice; else short-poll TX drain
     return Port.available() ? delay : INT32_MAX;
 #elif defined(IS_USB_SERIAL)
+#ifdef BADGE_JSCON2026
+    // isPlugged() reads false briefly after flash writes; back off only after 1 s of false readings.
+    static bool unpluggedSeen = false;
+    static uint32_t unpluggedSinceMs = 0;
+    if (HWCDC::isPlugged()) {
+        unpluggedSeen = false;
+        return delay;
+    }
+    if (!unpluggedSeen) {
+        unpluggedSeen = true;
+        unpluggedSinceMs = millis();
+    }
+    return Throttle::isWithinTimespanMs(unpluggedSinceMs, 1000) ? (delay < 100 ? delay : 100) : (1000 * 20);
+#else
     return HWCDC::isPlugged() ? delay : (1000 * 20);
+#endif
 #else
     return delay;
 #endif
