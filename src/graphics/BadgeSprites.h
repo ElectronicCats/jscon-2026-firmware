@@ -15,6 +15,8 @@ struct BadgeSprite {
     uint16_t width;
     uint16_t height;
     const uint16_t *pixelsBe; // RGB565, byte-swapped; kBadgeSpriteTransparent = see-through
+    // Streamed a row at a time when pixelsBe is null; RGB565 big-endian, opaque.
+    const char *filePath = nullptr;
 };
 
 static constexpr uint16_t kBadgeSpriteTransparent = 0x1FF8;
@@ -35,8 +37,9 @@ uint8_t currentBadgeAxolotl(uint16_t allowedMask);
 
 // Queue a sprite for the frame being drawn; later sprites are drawn over earlier ones.
 // With a tint, every opaque pixel takes that RGB565 color, which turns a sprite into a silhouette.
-// The queue is emptied after each display().
-void queueBadgeSprite(const BadgeSprite &sprite, int16_t x, int16_t y, uint16_t tint = kBadgeSpriteNoTint);
+// The queue is emptied after each display(), so `sprite` must outlive the frame.
+// A new `revision` forces a repaint of a file-backed sprite whose file changed.
+void queueBadgeSprite(const BadgeSprite &sprite, int16_t x, int16_t y, uint16_t tint = kBadgeSpriteNoTint, uint32_t revision = 0);
 uint32_t getBadgeSpriteSignature();
 void clearBadgeSprites();
 
