@@ -89,6 +89,9 @@ extern NicheGraphics::BaseUIEInkDisplay *setupNicheGraphicsBaseUI();
 #include "modules/WaypointModule.h"
 #include "sleep.h"
 #include "target_specific.h"
+#ifdef BADGE_JSCON2026
+#include "modules/badge/BadgeCanvasModule.h"
+#endif
 extern MessageStore messageStore;
 
 #if HAS_WIFI && !defined(ARCH_PORTDUINO)
@@ -485,6 +488,14 @@ static void drawGamesFrame(OLEDDisplay *display, OLEDDisplayUiState *state, int1
 {
     if (gamesModule)
         gamesModule->drawFrame(display, state, x, y);
+}
+#endif
+
+#ifdef BADGE_JSCON2026
+static void drawCanvasFrame(OLEDDisplay *display, OLEDDisplayUiState *state, int16_t x, int16_t y)
+{
+    if (badgeCanvasModule)
+        badgeCanvasModule->drawFrame(display, state, x, y);
 }
 #endif
 
@@ -1434,6 +1445,13 @@ void Screen::setFrames(FrameFocus focus)
         indicatorIcons.push_back(joystick_small);
         PUSH_FRAME_TITLE("Games");
     }
+#endif
+
+#ifdef BADGE_JSCON2026
+    // Canvas page: always present, so an image uploaded after boot shows without rebuilding frames.
+    normalFrames[numframes++] = drawCanvasFrame;
+    indicatorIcons.push_back(icon_module);
+    PUSH_FRAME_TITLE("Canvas");
 #endif
 
     fsi.positions.textMessage = numframes;
