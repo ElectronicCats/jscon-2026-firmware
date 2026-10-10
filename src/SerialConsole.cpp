@@ -43,6 +43,20 @@ SerialConsole *console;
 static bool s_serialLinkUp = false;
 #endif
 
+#if defined(BADGE_JSCON2026) && defined(IS_USB_SERIAL)
+#include "hal/usb_serial_jtag_ll.h"
+
+/// HWCDC moves its TX ring into the USB FIFO only from the IN_EMPTY interrupt, and that event can be lost. With no
+/// IN_EMPTY pending and the FIFO still accepting data, nothing is on its way to the host and no interrupt will come, so
+/// queued bytes would wait until reset. A flush sends whatever the FIFO holds, or a zero-length packet, and the host
+/// picking it up raises IN_EMPTY again.
+static void restartStalledUsbTx()
+{
+    if (!(usb_serial_jtag_ll_get_intraw_mask() & USB_SERIAL_JTAG_INTR_SERIAL_IN_EMPTY) && usb_serial_jtag_ll_txfifo_writable())
+        usb_serial_jtag_ll_txfifo_flush();
+}
+#endif
+
 /// Create the shared serial console once and register receive wakeups.
 void consoleInit()
 {
@@ -137,6 +151,7 @@ int32_t SerialConsole::runOnce()
     static uint32_t unpluggedSinceMs = 0;
     if (HWCDC::isPlugged()) {
         unpluggedSeen = false;
+        restartStalledUsbTx();
         return delay;
     }
     if (!unpluggedSeen) {
@@ -236,6 +251,7 @@ bool SerialConsole::finishPendingFrame()
 #ifdef IS_USB_SERIAL
     concurrency::LockGuard guard(&streamLock);
 #ifdef BADGE_JSCON2026
+    restartStalledUsbTx();
     const uint32_t startedMs = millis();
     const bool finished = frameWriter.finishPendingFrame(Port);
     if (s_hostDraining && !finished && !Throttle::isWithinTimespanMs(startedMs, kHostStallMs))
@@ -282,6 +298,7 @@ bool SerialConsole::writeFrame(uint8_t *buf, size_t len, bool bestEffort)
 
     concurrency::LockGuard guard(&streamLock);
 #ifdef BADGE_JSCON2026
+    restartStalledUsbTx();
     const uint32_t startedMs = millis();
     const bool written = frameWriter.writeFrame(Port, buf, totalLen, bestEffort);
     if (s_hostDraining && !written && !Throttle::isWithinTimespanMs(startedMs, kHostStallMs))
