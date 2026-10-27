@@ -9,6 +9,9 @@
 #include "Throttle.h"
 #include "concurrency/LockGuard.h"
 #include "main.h"
+#ifdef BADGE_JSCON2026
+#include "graphics/BadgeStream.h"
+#endif
 #include "time.h"
 
 #if defined(ARDUINO_USB_CDC_ON_BOOT) && ARDUINO_USB_CDC_ON_BOOT
@@ -138,6 +141,10 @@ int32_t SerialConsole::runOnce()
 #endif
 
     int32_t delay = runOncePart();
+#ifdef BADGE_JSCON2026
+    if (pumpScreenStream())
+        delay = 0; // more frames queued: come straight back
+#endif
 #if defined(SERIAL_HAS_ON_RECEIVE) || defined(CONFIG_IDF_TARGET_ESP32S2)
     // Nothing wakes the idle sleep for "TX space freed" or a bounded-drain remainder
     // (#11164), so keep polling while the API holds undelivered output.
@@ -286,6 +293,31 @@ bool SerialConsole::canEncodeLogRecord()
     return true;
 #endif
 }
+
+#ifdef BADGE_JSCON2026
+/// Send queued screen-stream frames, one writer slice at a time, only while nothing else is retained.
+bool SerialConsole::pumpScreenStream()
+{
+#ifdef IS_USB_SERIAL
+    if (!graphics::badgeStreamHasData())
+        return false;
+    for (int i = 0; i < 8; i++) {
+        if (!frameWriter.isIdle() || !canWrite)
+            return graphics::badgeStreamHasData();
+        const size_t len = graphics::badgeStreamPop(txBufScreen + 4);
+        if (len == 0)
+            return false;
+        // Not best-effort: HWCDC's TX ring is smaller than a frame, so a best-effort write would never start.
+        // A partial write is retained by frameWriter, so only a failure with nothing retained means a lost frame.
+        if (!writeFrame(txBufScreen, len, false) && frameWriter.isIdle())
+            graphics::badgeStreamStart(); // frame lost: ask for a keyframe (also clears the queue)
+    }
+    return graphics::badgeStreamHasData();
+#else
+    return false;
+#endif
+}
+#endif
 
 /// Frame USB CDC output and retain any unwritten tail.
 bool SerialConsole::writeFrame(uint8_t *buf, size_t len, bool bestEffort)

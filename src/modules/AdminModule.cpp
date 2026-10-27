@@ -12,6 +12,7 @@
 #include "input/InputBroker.h"
 #ifdef BADGE_JSCON2026
 #include "graphics/BadgeScreenshot.h"
+#include "graphics/BadgeStream.h"
 #endif
 #include "meshUtils.h"
 #include <ErriezCRC32.h>
@@ -2175,6 +2176,14 @@ void AdminModule::handleSendInputEvent(const meshtastic_AdminMessage_InputEvent 
 #ifdef BADGE_JSCON2026
     if (inputEvent.event_code == graphics::kBadgeScreenshotEvent) {
         graphics::requestBadgeScreenshot();
+        return;
+    }
+    if (inputEvent.event_code == graphics::kBadgeStreamStartEvent) {
+        graphics::badgeStreamStart();
+        return;
+    }
+    if (inputEvent.event_code == graphics::kBadgeStreamStopEvent) {
+        graphics::badgeStreamStop();
         return;
     }
 #endif
