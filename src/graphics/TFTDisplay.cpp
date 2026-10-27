@@ -1454,6 +1454,7 @@ static LGFX *tft = nullptr;
 static LGFX *tft = nullptr;
 
 #endif
+#include "BadgeScreenshot.h"
 #include "BadgeSprites.h"
 #include "SPILock.h"
 #include "TFTColorRegions.h"
@@ -1572,8 +1573,9 @@ void TFTDisplay::display(bool fromBlank)
 #ifdef BADGE_JSCON2026
     static uint32_t lastSpriteSignature = 0;
     const uint32_t spriteSignature = graphics::getBadgeSpriteSignature();
-    const bool forceFullColorRepaint =
-        forceFullRepaint || (colorFrameSignature != lastColorFrameSignature) || (spriteSignature != lastSpriteSignature);
+    const bool screenshotPending = graphics::badgeScreenshotPending();
+    const bool forceFullColorRepaint = forceFullRepaint || (colorFrameSignature != lastColorFrameSignature) ||
+                                       (spriteSignature != lastSpriteSignature) || screenshotPending;
     lastSpriteSignature = spriteSignature;
 #else
     const bool forceFullColorRepaint = forceFullRepaint || (colorFrameSignature != lastColorFrameSignature);
@@ -1582,6 +1584,10 @@ void TFTDisplay::display(bool fromBlank)
     // When region roles/layout changed, color can differ even with identical monochrome glyph bits.
     // Repaint full frame only for those frames, then return to diff-based updates.
     if (forceFullColorRepaint) {
+#ifdef BADGE_JSCON2026
+        if (screenshotPending)
+            graphics::badgeScreenshotBegin();
+#endif
         for (uint32_t yStart = 0; yStart < displayHeight; yStart += kFullRepaintChunkRows) {
             const uint32_t rowsThisChunk = min<uint32_t>(kFullRepaintChunkRows, displayHeight - yStart);
             for (uint32_t row = 0; row < rowsThisChunk; row++) {
@@ -1621,6 +1627,10 @@ void TFTDisplay::display(bool fromBlank)
                                                  colorTftBlack);
 #endif
             }
+#ifdef BADGE_JSCON2026
+            if (screenshotPending)
+                graphics::badgeScreenshotWrite(repaintChunkBuffer, (size_t)displayWidth * rowsThisChunk);
+#endif
 #if defined(USE_ARDUINO_GFX)
             tft->draw16bitBeRGBBitmap(0, yStart, repaintChunkBuffer, displayWidth, rowsThisChunk);
 #else
@@ -1628,6 +1638,10 @@ void TFTDisplay::display(bool fromBlank)
 #endif
         }
 
+#ifdef BADGE_JSCON2026
+        if (screenshotPending)
+            graphics::badgeScreenshotEnd();
+#endif
         memcpy(buffer_back, buffer, displayBufferSize);
         lastColorFrameSignature = colorFrameSignature;
         haveLastDefaults = true;
