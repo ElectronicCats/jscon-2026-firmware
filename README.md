@@ -106,6 +106,8 @@ pio run -e badge_jscon2026 -t upload --upload-port <port>
 | Game radio  | `src/modules/badge/AxolotlModule.cpp`             |
 | Game pages  | `src/graphics/draw/BadgeAxolotlRenderer.cpp`      |
 | Color art   | `src/graphics/BadgeSprites.cpp`                   |
+| Screenshot  | `src/graphics/BadgeScreenshot.cpp`                |
+| Screen live | `src/graphics/BadgeStream.cpp`                    |
 
 Hardware: ESP32-S3-WROOM-1-N8 with 8 MB of flash and no PSRAM, an LLCC68 LoRa radio at 915 MHz, a 428 x 142 NV3007 display, four pushbuttons, USB powered with no battery and no GPS.
 
