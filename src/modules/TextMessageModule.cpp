@@ -21,9 +21,18 @@ ProcessMessage TextMessageModule::handleReceived(const meshtastic_MeshPacket &mp
     textPacketList[textPacketListIndex] = mp.id;
     textPacketListIndex = (textPacketListIndex + 1) % TEXT_PACKET_LIST_SIZE;
 
+#ifdef BADGE_JSCON2026
+    // A message to our own node is already stored on its way out (MeshService::handleToRadio), so the copy that
+    // loops back here would show it twice. The looped-back copy still has from == 0 when a client sent it.
+    const uint32_t localNode = nodeDB->getNodeNum();
+    const bool selfLoopback = mp.to == localNode && (mp.from == 0 || mp.from == localNode);
+#else
+    const bool selfLoopback = false;
+#endif
+
     IF_SCREEN(
         // Guard against running in MeshtasticUI or with no screen
-        if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR) {
+        if (config.display.displaymode != meshtastic_Config_DisplayConfig_DisplayMode_COLOR && !selfLoopback) {
             // Store in the central message history
             const StoredMessage *sm = messageStore.tryAddFromPacket(mp);
             if (!sm)
