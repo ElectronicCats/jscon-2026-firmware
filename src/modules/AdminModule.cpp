@@ -10,6 +10,10 @@
 #include "SPILock.h"
 #include "gps/RTC.h"
 #include "input/InputBroker.h"
+#ifdef BADGE_JSCON2026
+#include "graphics/BadgeScreenshot.h"
+#include "graphics/BadgeStream.h"
+#endif
 #include "meshUtils.h"
 #include <ErriezCRC32.h>
 #include <FSCommon.h>
@@ -2168,6 +2172,21 @@ void AdminModule::handleSendInputEvent(const meshtastic_AdminMessage_InputEvent 
 {
     LOG_TRACE("Processing input event: event_code=%u, kb_char=%u, touch_x=%u, touch_y=%u", inputEvent.event_code,
               inputEvent.kb_char, inputEvent.touch_x, inputEvent.touch_y);
+
+#ifdef BADGE_JSCON2026
+    if (inputEvent.event_code == graphics::kBadgeScreenshotEvent) {
+        graphics::requestBadgeScreenshot();
+        return;
+    }
+    if (inputEvent.event_code == graphics::kBadgeStreamStartEvent) {
+        graphics::badgeStreamStart();
+        return;
+    }
+    if (inputEvent.event_code == graphics::kBadgeStreamStopEvent) {
+        graphics::badgeStreamStop();
+        return;
+    }
+#endif
 
     // Create InputEvent for injection.
     //

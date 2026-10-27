@@ -34,6 +34,12 @@ class SerialConsole : public StreamAPI, public RedirectablePrint, private concur
     void flush();
     /// Wake the serial thread after receive activity.
     void rxInt();
+#ifdef BADGE_JSCON2026
+    /// Wake the serial thread because the screen stream has frames queued.
+    void wakeForStream() { setIntervalFromNow(0); }
+    /// Send queued screen-stream frames while the USB writer is idle. True while more remain.
+    bool pumpScreenStream();
+#endif
 
   protected:
     /// Check the current underlying physical link to see if the client is currently connected
@@ -59,6 +65,9 @@ class SerialConsole : public StreamAPI, public RedirectablePrint, private concur
     virtual bool writeFrame(uint8_t *buf, size_t len, bool bestEffort) override;
 
   private:
+#ifdef BADGE_JSCON2026
+    uint8_t txBufScreen[MAX_STREAM_BUF_SIZE];
+#endif
     /// On USB CDC targets, keep console TX non-blocking unless a host is draining the
     /// port, so a dead host can't stall the main loop and trip the task watchdog.
     void setHostDraining(bool draining);

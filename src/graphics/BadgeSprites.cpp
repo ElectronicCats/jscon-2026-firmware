@@ -2,6 +2,7 @@
 
 #ifdef BADGE_JSCON2026
 
+#include "FSCommon.h"
 #include "Throttle.h"
 #include "jsconf_sprites.h"
 #include <Arduino.h>
@@ -55,11 +56,39 @@ struct QueuedSprite {
     int16_t x;
     int16_t y;
     uint16_t tintBe;
+    uint32_t revision;
 };
 
 constexpr uint8_t kMaxQueuedSprites = 20; // background + every slot of the collection grid + spare
 QueuedSprite queued[kMaxQueuedSprites];
 uint8_t queuedCount = 0;
+
+// Rows arrive in increasing y, so one handle stays open per repaint. Called with spiLock held.
+constexpr uint16_t kStageRowWidth = JSCONF_BACKGROUND_W;
+uint16_t fileRow[kStageRowWidth];
+File rowFile;
+const char *rowFilePath = nullptr;
+uint32_t rowFileOffset = 0;
+
+bool readFileRow(const BadgeSprite &s, int32_t spriteRow)
+{
+    const uint32_t rowBytes = (uint32_t)s.width * 2;
+    const uint32_t offset = (uint32_t)spriteRow * rowBytes;
+    if (!rowFile || rowFilePath != s.filePath) {
+        if (rowFile)
+            rowFile.close();
+        rowFile = FSCom.open(s.filePath, FILE_O_READ);
+        rowFilePath = s.filePath;
+        rowFileOffset = 0;
+        if (!rowFile)
+            return false;
+    }
+    if (offset != rowFileOffset && !rowFile.seek(offset))
+        return false;
+    const size_t got = rowFile.read((uint8_t *)fileRow, rowBytes);
+    rowFileOffset = offset + got;
+    return got == rowBytes;
+}
 } // namespace
 
 const BadgeSprite &axolotlSprite(uint8_t id, AxolotlSize size)
@@ -94,13 +123,13 @@ uint8_t currentBadgeAxolotl(uint16_t allowedMask)
     return axolotlOrder[axolotlPosition];
 }
 
-void queueBadgeSprite(const BadgeSprite &sprite, int16_t x, int16_t y, uint16_t tint)
+void queueBadgeSprite(const BadgeSprite &sprite, int16_t x, int16_t y, uint16_t tint, uint32_t revision)
 {
     if (queuedCount >= kMaxQueuedSprites)
         return;
     const uint16_t tintBe =
         (tint == kBadgeSpriteNoTint) ? kBadgeSpriteTransparent : static_cast<uint16_t>((tint >> 8) | ((tint & 0xFF) << 8));
-    queued[queuedCount++] = {&sprite, x, y, tintBe};
+    queued[queuedCount++] = {&sprite, x, y, tintBe, revision};
 }
 
 uint32_t getBadgeSpriteSignature()
@@ -108,7 +137,7 @@ uint32_t getBadgeSpriteSignature()
     uint32_t hash = 2166136261u;
     for (uint8_t i = 0; i < queuedCount; i++) {
         const uint32_t parts[] = {(uint32_t)(uintptr_t)queued[i].sprite, (uint32_t)(uint16_t)queued[i].x,
-                                  (uint32_t)(uint16_t)queued[i].y, (uint32_t)queued[i].tintBe};
+                                  (uint32_t)(uint16_t)queued[i].y, (uint32_t)queued[i].tintBe, queued[i].revision};
         for (uint32_t part : parts)
             hash = (hash ^ part) * 16777619u;
     }
@@ -118,6 +147,10 @@ uint32_t getBadgeSpriteSignature()
 void clearBadgeSprites()
 {
     queuedCount = 0;
+    // An open handle would race XModem replacing the file.
+    if (rowFile)
+        rowFile.close();
+    rowFilePath = nullptr;
 }
 
 void overlayBadgeSpritesRow(int16_t y, int16_t xStart, int16_t xEnd, uint16_t *row, uint16_t backgroundBe)
@@ -131,11 +164,22 @@ void overlayBadgeSpritesRow(int16_t y, int16_t xStart, int16_t xEnd, uint16_t *r
 
         const int32_t first = (xStart > q.x) ? xStart : q.x;
         const int32_t last = (xEnd < q.x + q.sprite->width - 1) ? xEnd : (q.x + q.sprite->width - 1);
-        const uint16_t *src = q.sprite->pixelsBe + spriteRow * q.sprite->width;
+        if (first > last)
+            continue;
+
+        const uint16_t *src;
+        if (q.sprite->pixelsBe)
+            src = q.sprite->pixelsBe + spriteRow * q.sprite->width;
+        else if (q.sprite->filePath && q.sprite->width <= kStageRowWidth && readFileRow(*q.sprite, spriteRow))
+            src = fileRow;
+        else
+            continue;
+
+        const bool opaque = src == fileRow;
         const bool tinted = q.tintBe != kBadgeSpriteTransparent;
         for (int32_t x = first; x <= last; x++) {
             const uint16_t pixel = src[x - q.x];
-            if (pixel != kBadgeSpriteTransparent && row[x] == backgroundBe)
+            if ((opaque || pixel != kBadgeSpriteTransparent) && row[x] == backgroundBe)
                 row[x] = tinted ? q.tintBe : pixel;
         }
     }

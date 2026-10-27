@@ -6,6 +6,7 @@
 #include "modules/StatusLEDModule.h"
 #ifdef BADGE_JSCON2026
 #include "modules/badge/AxolotlModule.h"
+#include "modules/badge/BadgeCanvasModule.h"
 #endif
 #if !MESHTASTIC_EXCLUDE_REPLYBOT
 #include "ReplyBotModule.h"
@@ -138,6 +139,7 @@ void setupModules()
 #endif
 #ifdef BADGE_JSCON2026
     axolotlModule = new AxolotlModule();
+    badgeCanvasModule = new BadgeCanvasModule();
 #endif
 
 #if HAS_TRAFFIC_MANAGEMENT && !MESHTASTIC_EXCLUDE_TRAFFIC_MANAGEMENT

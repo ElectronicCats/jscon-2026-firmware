@@ -9,6 +9,9 @@
 #include "Throttle.h"
 #include "concurrency/LockGuard.h"
 #include "main.h"
+#ifdef BADGE_JSCON2026
+#include "graphics/BadgeStream.h"
+#endif
 #include "time.h"
 
 #if defined(ARDUINO_USB_CDC_ON_BOOT) && ARDUINO_USB_CDC_ON_BOOT
@@ -41,6 +44,20 @@ SerialConsole *console;
 // hierarchy has historically perturbed nRF52 USB-CDC enumeration (see PhoneAPI.h).
 // Only compiled on lockdown (nRF52) builds.
 static bool s_serialLinkUp = false;
+#endif
+
+#if defined(BADGE_JSCON2026) && defined(IS_USB_SERIAL)
+#include "hal/usb_serial_jtag_ll.h"
+
+/// HWCDC moves its TX ring into the USB FIFO only from the IN_EMPTY interrupt, and that event can be lost. With no
+/// IN_EMPTY pending and the FIFO still accepting data, nothing is on its way to the host and no interrupt will come, so
+/// queued bytes would wait until reset. A flush sends whatever the FIFO holds, or a zero-length packet, and the host
+/// picking it up raises IN_EMPTY again.
+static void restartStalledUsbTx()
+{
+    if (!(usb_serial_jtag_ll_get_intraw_mask() & USB_SERIAL_JTAG_INTR_SERIAL_IN_EMPTY) && usb_serial_jtag_ll_txfifo_writable())
+        usb_serial_jtag_ll_txfifo_flush();
+}
 #endif
 
 /// Create the shared serial console once and register receive wakeups.
@@ -124,6 +141,10 @@ int32_t SerialConsole::runOnce()
 #endif
 
     int32_t delay = runOncePart();
+#ifdef BADGE_JSCON2026
+    if (pumpScreenStream())
+        delay = 0; // more frames queued: come straight back
+#endif
 #if defined(SERIAL_HAS_ON_RECEIVE) || defined(CONFIG_IDF_TARGET_ESP32S2)
     // Nothing wakes the idle sleep for "TX space freed" or a bounded-drain remainder
     // (#11164), so keep polling while the API holds undelivered output.
@@ -131,7 +152,23 @@ int32_t SerialConsole::runOnce()
         return delay < 25 ? delay : 25; // 0 continues a budget slice; else short-poll TX drain
     return Port.available() ? delay : INT32_MAX;
 #elif defined(IS_USB_SERIAL)
+#ifdef BADGE_JSCON2026
+    // isPlugged() reads false briefly after flash writes; back off only after 1 s of false readings.
+    static bool unpluggedSeen = false;
+    static uint32_t unpluggedSinceMs = 0;
+    if (HWCDC::isPlugged()) {
+        unpluggedSeen = false;
+        restartStalledUsbTx();
+        return delay;
+    }
+    if (!unpluggedSeen) {
+        unpluggedSeen = true;
+        unpluggedSinceMs = millis();
+    }
+    return Throttle::isWithinTimespanMs(unpluggedSinceMs, 1000) ? (delay < 100 ? delay : 100) : (1000 * 20);
+#else
     return HWCDC::isPlugged() ? delay : (1000 * 20);
+#endif
 #else
     return delay;
 #endif
@@ -178,6 +215,13 @@ bool SerialConsole::checkIsConnected()
     return Throttle::isWithinTimespanMs(lastContactMsec, SERIAL_CONNECTION_TIMEOUT);
 }
 
+#if defined(BADGE_JSCON2026) && defined(IS_USB_SERIAL)
+// HWCDC returns a short blocking write only after ~2 s without progress. A host that closed the
+// port without ToRadio.disconnect would cost that on every write, so stop blocking until it talks again.
+static bool s_hostDraining = false;
+static constexpr uint32_t kHostStallMs = 1000;
+#endif
+
 /// Select bounded or non-blocking HWCDC writes based on host liveness.
 void SerialConsole::setHostDraining(bool draining)
 {
@@ -185,6 +229,9 @@ void SerialConsole::setHostDraining(bool draining)
     // Timeout 0 makes HWCDC writes drop instead of block when the host stops draining;
     // bounded blocking is restored while an API client is connected so frames aren't truncated.
     Port.setTxTimeoutMs(draining ? 100 : 0);
+#ifdef BADGE_JSCON2026
+    s_hostDraining = draining;
+#endif
 #else
     (void)draining;
 #endif
@@ -210,7 +257,16 @@ bool SerialConsole::finishPendingFrame()
 {
 #ifdef IS_USB_SERIAL
     concurrency::LockGuard guard(&streamLock);
+#ifdef BADGE_JSCON2026
+    restartStalledUsbTx();
+    const uint32_t startedMs = millis();
+    const bool finished = frameWriter.finishPendingFrame(Port);
+    if (s_hostDraining && !finished && !Throttle::isWithinTimespanMs(startedMs, kHostStallMs))
+        setHostDraining(false);
+    return finished;
+#else
     return frameWriter.finishPendingFrame(Port);
+#endif
 #else
     return true;
 #endif
@@ -238,6 +294,31 @@ bool SerialConsole::canEncodeLogRecord()
 #endif
 }
 
+#ifdef BADGE_JSCON2026
+/// Send queued screen-stream frames, one writer slice at a time, only while nothing else is retained.
+bool SerialConsole::pumpScreenStream()
+{
+#ifdef IS_USB_SERIAL
+    if (!graphics::badgeStreamHasData())
+        return false;
+    for (int i = 0; i < 8; i++) {
+        if (!frameWriter.isIdle() || !canWrite)
+            return graphics::badgeStreamHasData();
+        const size_t len = graphics::badgeStreamPop(txBufScreen + 4);
+        if (len == 0)
+            return false;
+        // Not best-effort: HWCDC's TX ring is smaller than a frame, so a best-effort write would never start.
+        // A partial write is retained by frameWriter, so only a failure with nothing retained means a lost frame.
+        if (!writeFrame(txBufScreen, len, false) && frameWriter.isIdle())
+            graphics::badgeStreamStart(); // frame lost: ask for a keyframe (also clears the queue)
+    }
+    return graphics::badgeStreamHasData();
+#else
+    return false;
+#endif
+}
+#endif
+
 /// Frame USB CDC output and retain any unwritten tail.
 bool SerialConsole::writeFrame(uint8_t *buf, size_t len, bool bestEffort)
 {
@@ -248,7 +329,16 @@ bool SerialConsole::writeFrame(uint8_t *buf, size_t len, bool bestEffort)
     const size_t totalLen = buildFrameHeader(buf, len);
 
     concurrency::LockGuard guard(&streamLock);
+#ifdef BADGE_JSCON2026
+    restartStalledUsbTx();
+    const uint32_t startedMs = millis();
+    const bool written = frameWriter.writeFrame(Port, buf, totalLen, bestEffort);
+    if (s_hostDraining && !written && !Throttle::isWithinTimespanMs(startedMs, kHostStallMs))
+        setHostDraining(false);
+    return written;
+#else
     return frameWriter.writeFrame(Port, buf, totalLen, bestEffort);
+#endif
 #else
     return StreamAPI::writeFrame(buf, len, bestEffort);
 #endif
