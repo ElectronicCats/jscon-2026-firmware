@@ -80,9 +80,10 @@ On Linux, `pip install` can refuse to run outside a virtual environment, and the
 ```bash
 python3 -m venv ~/esptool-venv
 ~/esptool-venv/bin/pip install esptool
+source ~/esptool-venv/bin/activate
 ```
 
-Then run `~/esptool-venv/bin/esptool` wherever the commands below say `esptool`.
+In that terminal, `esptool` is now version 5 and the commands below work as written. In a new terminal, run the `source` line again, or call `~/esptool-venv/bin/esptool` directly.
 
 ```bash
 esptool --chip esp32s3 --port <port> erase-flash
