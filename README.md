@@ -75,6 +75,16 @@ The images below are mockups drawn on a computer, not photos of the screen.
 
 Download `badge_jscon2026-factory.bin` from the releases page. You need [esptool](https://github.com/espressif/esptool) 5 or newer: `pip install esptool`.
 
+On Linux, `pip install` can refuse to run outside a virtual environment, and the `esptool` package that ships with some distributions is 4.x: it spells the commands `erase_flash` and `write_flash`, and the 4.7.0 package from a Debian-based distribution misses its flasher stubs and crashes with `FileNotFoundError ... stub_flasher_32s3.json`. Install version 5 in its own environment instead:
+
+```bash
+python3 -m venv ~/esptool-venv
+~/esptool-venv/bin/pip install esptool
+source ~/esptool-venv/bin/activate
+```
+
+In that terminal, `esptool` is now version 5 and the commands below work as written. In a new terminal, run the `source` line again, or call `~/esptool-venv/bin/esptool` directly.
+
 ```bash
 esptool --chip esp32s3 --port <port> erase-flash
 esptool --chip esp32s3 --port <port> write-flash 0x0 badge_jscon2026-factory.bin
